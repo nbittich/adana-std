@@ -1,15 +1,20 @@
-[package]
-name = "adana-std"
-version = "0.1.0"
-edition = "2021"
+[workspace]
+members = ["fs"]
+resolver = "2"
 
-
-[lib]
-crate-type = ["dylib"]
-
-[dependencies]
+[workspace.dependencies]
 adana-script-core = "0.14.0"
 anyhow = "1.0.75"
+
+
+[workspace.package]
+version = "0.1.0"
+authors = ["Nordine Bittich"]
+description = "Adana standard library"
+documentation = "https://github.com/nbittich/adana-std"
+rust-version = "1.72.1"
+edition = "2021"
+license = "MIT"
 
 [profile.release]
 opt-level = 'z'   # Optimize for size.

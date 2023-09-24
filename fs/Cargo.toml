@@ -1,0 +1,12 @@
+[package]
+name = "adana-std-fs"
+version = { workspace = true }
+edition = { workspace = true }
+
+
+[lib]
+crate-type = ["dylib"]
+
+[dependencies]
+adana-script-core = { workspace = true }
+anyhow = { workspace = true }
