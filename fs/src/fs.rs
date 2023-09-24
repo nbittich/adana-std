@@ -230,7 +230,7 @@ pub fn fd_stats(params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunct
 
 /// Api description
 #[no_mangle]
-pub fn fs_description(
+pub fn api_description(
     _params: Vec<Primitive>,
     _compiler: Box<Compiler>,
 ) -> NativeFunctionCallResult {
