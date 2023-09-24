@@ -75,6 +75,24 @@ pub fn read_file(params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunc
 }
 
 #[no_mangle]
+pub fn make_dir(params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunctionCallResult {
+    let mut open_options = OpenOptions::new();
+    let open_options = open_options.read(true).write(false);
+    let (pb, _) = get_file_from_params(&params, 1, open_options, false, false)?;
+    std::fs::create_dir(pb)?;
+    Ok(Primitive::Unit)
+}
+
+#[no_mangle]
+pub fn make_dir_all(params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunctionCallResult {
+    let mut open_options = OpenOptions::new();
+    let open_options = open_options.read(true).write(false);
+    let (pb, _) = get_file_from_params(&params, 1, open_options, false, false)?;
+    std::fs::create_dir_all(pb)?;
+    Ok(Primitive::Unit)
+}
+
+#[no_mangle]
 pub fn read_dir(params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunctionCallResult {
     let mut open_options = OpenOptions::new();
     let open_options = open_options.read(true).write(false);
@@ -258,6 +276,14 @@ pub fn api_description(
         (
             "delete_dir_all".into(),
             Primitive::String("delete_dir_all(path), Delete a directory and all its content.".into())
+        ),
+        (
+            "make_dir".into(),
+            Primitive::String("make_dir(path), Create a directory.".into())
+        ),
+        (
+            "make_dir_all".into(),
+            Primitive::String("make_dir_all(path), Create a directory recursively.".into())
         ),
         (
             "append_file".into(),
