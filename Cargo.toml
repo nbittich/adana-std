@@ -8,7 +8,7 @@ anyhow = "1.0.75"
 
 
 [workspace.package]
-version = "0.1.0"
+version = "0.0.1"
 authors = ["Nordine Bittich"]
 description = "Adana standard library"
 documentation = "https://github.com/nbittich/adana-std"

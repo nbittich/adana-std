@@ -1,0 +1,28 @@
+name: Release
+permissions:
+  contents: write
+on:
+  push:
+    tags:
+      - "**[0-9]+.[0-9]+.[0-9]+*"
+
+jobs:
+  runs-on: ubuntu-latest
+  env:
+    GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: recursive
+    - name: install rust
+      run: "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
+    - id: build shared libs
+      run: |
+        cargo build --release
+        cd target/release
+        for f in libadana_std_*.so; do mv "$f" "${f#libadana_std_}"; done
+        tar cvzf adana-std.tar.gz *.so # to untar: mkdir /tmp/adana-std && tar xvzf adana-std.tar.gz  -C /tmp/adana-std
+        echo "New adana std version " > new_version_announcement.md
+        gh release create ${{ github.ref_name }} --draft --title="Adana Std ${{github.ref_name}}" --notes-file=new_version_announcement.md
+        gh release upload ${{ github.ref_name }} adana-std.tar.gz
+        gh release edit ${{ github.ref_name }} --draft=false
