@@ -1,3 +1,5 @@
+use std::io::Write;
+
 use adana_script_core::primitive::{Compiler, NativeFunctionCallResult, Primitive};
 
 #[no_mangle]
@@ -12,6 +14,7 @@ pub fn read_line(params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunc
             .join(" ")
     };
     print!("{message}");
+    std::io::stdout().flush()?;
 
     let stdin = std::io::stdin();
 
