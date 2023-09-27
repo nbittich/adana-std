@@ -11,9 +11,10 @@ pub fn read_line(params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunc
             .collect::<Vec<_>>()
             .join(" ")
     };
+    print!("{message}");
+
     let stdin = std::io::stdin();
 
-    print!("{message}");
     let mut buf = String::with_capacity(100);
     stdin.read_line(&mut buf)?;
     Ok(Primitive::String(buf))
