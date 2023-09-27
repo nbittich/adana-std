@@ -1,5 +1,5 @@
 [workspace]
-members = ["fs"]
+members = ["fs", "io"]
 resolver = "2"
 
 [workspace.dependencies]
@@ -8,7 +8,7 @@ anyhow = "1.0.75"
 
 
 [workspace.package]
-version = "0.0.1"
+version = "0.0.2"
 authors = ["Nordine Bittich"]
 description = "Adana standard library"
 documentation = "https://github.com/nbittich/adana-std"
