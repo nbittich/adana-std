@@ -31,13 +31,11 @@ fn get_file_from_params(
                 } else {
                     Ok((path_buf, None))
                 }
+            } else if !open_file {
+                Ok((path_buf, None))
             } else {
-                if !open_file {
-                    Ok((path_buf, None))
-                } else {
-                    let file = open_option.open(file_path)?;
-                    Ok((path_buf, Some(file)))
-                }
+                let file = open_option.open(file_path)?;
+                Ok((path_buf, Some(file)))
             }
         }
         _ => Err(anyhow::anyhow!("wrong read lines call".to_string())),
