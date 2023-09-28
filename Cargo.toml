@@ -1,5 +1,5 @@
 [workspace]
-members = ["fs", "io"]
+members = ["fs", "io", "process"]
 resolver = "2"
 
 [workspace.dependencies]
