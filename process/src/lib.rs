@@ -13,7 +13,7 @@ pub fn environ(params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFuncti
             .collect::<BTreeMap<_, _>>();
         Ok(Primitive::Struct(s))
     } else {
-        let r = std::env::var(&params[0].to_string())
+        let r = std::env::var(params[0].to_string())
             .ok()
             .map(Primitive::String)
             .unwrap_or_else(|| Primitive::Null);
