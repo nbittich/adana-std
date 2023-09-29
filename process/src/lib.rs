@@ -1,6 +1,9 @@
-use std::{collections::BTreeMap, time::Duration};
+use std::{collections::BTreeMap, io::Write, thread::JoinHandle, time::Duration};
 
-use adana_script_core::primitive::{Compiler, NativeFunctionCallResult, Primitive};
+use adana_script_core::{
+    primitive::{Compiler, NativeFunctionCallResult, Primitive},
+    Value,
+};
 
 #[no_mangle]
 pub fn environ(params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunctionCallResult {
@@ -18,7 +21,7 @@ pub fn environ(params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFuncti
     }
 }
 #[no_mangle]
-pub fn delay(mut params: Vec<Primitive>, mut _compiler: Box<Compiler>) -> NativeFunctionCallResult {
+pub fn delay(mut params: Vec<Primitive>, mut compiler: Box<Compiler>) -> NativeFunctionCallResult {
     if params.is_empty() {
         Err(anyhow::anyhow!("at least one parameter must be provided"))
     } else {
@@ -30,47 +33,43 @@ pub fn delay(mut params: Vec<Primitive>, mut _compiler: Box<Compiler>) -> Native
         if params.is_empty() {
             std::thread::sleep(Duration::from_millis(delay as u64));
             Ok(Primitive::Unit)
+        } else if params.len() == 2 {
+            let handle: JoinHandle<anyhow::Result<()>> = std::thread::spawn(move || {
+                std::thread::sleep(Duration::from_millis(delay as u64));
+
+                let f @ Primitive::Function { .. } = params.remove(0) else {
+                    return Err(anyhow::anyhow!("second parameter must be a function"));
+                };
+                let Primitive::Struct(ctx) = params.remove(0) else {
+                    return Err(anyhow::anyhow!(
+                        "third parameter must be the context (struct)"
+                    ));
+                };
+                let function = f.to_value()?;
+                let ctx = ctx
+                    .into_iter()
+                    .map(|(k, v)| (k, v.ref_prim()))
+                    .collect::<BTreeMap<_, _>>();
+
+                let parameters = ctx.keys().cloned().map(Value::String).collect::<Vec<_>>();
+                compiler(
+                    Value::FunctionCall {
+                        parameters: Box::new(Value::BlockParen(parameters)),
+                        function: Box::new(function),
+                    },
+                    ctx,
+                )?;
+                std::io::stdout().flush()?;
+                Ok(())
+            });
+            std::thread::spawn(move || match handle.join() {
+                Ok(Ok(())) => {}
+                e => eprintln!("{e:?}"),
+            });
+            Ok(Primitive::Unit)
         } else {
             Err(anyhow::anyhow!("too many arguments"))
         }
-        // if params.len() == 2 {
-        //     let handle: JoinHandle<anyhow::Result<()>> = std::thread::spawn(move || {
-        //         std::thread::sleep(Duration::from_millis(delay as u64));
-        //
-        //         let f @ Primitive::Function { .. } = params.remove(0) else {
-        //             return Err(anyhow::anyhow!("second parameter must be a function"));
-        //         };
-        //         let Primitive::Struct(ctx) = params.remove(0) else {
-        //             return Err(anyhow::anyhow!(
-        //                 "third parameter must be the context (struct)"
-        //             ));
-        //         };
-        //         let function = f.to_value()?;
-        //         let ctx = ctx
-        //             .into_iter()
-        //             .map(|(k, v)| (k, v.ref_prim()))
-        //             .collect::<BTreeMap<_, _>>();
-        //
-        //         let parameters = ctx.keys().cloned().map(Value::String).collect::<Vec<_>>();
-        //         compiler(
-        //             Value::FunctionCall {
-        //                 parameters: Box::new(Value::BlockParen(parameters)),
-        //                 function: Box::new(function),
-        //             },
-        //             ctx,
-        //         )?;
-        //         std::io::stdout().flush()?;
-        //         Ok(())
-        //     });
-        //     std::thread::spawn(move || match handle.join() {
-        //         Ok(Ok(())) => {}
-        //         e => eprintln!("{e:?}"),
-        //     });
-        // } else {
-        //     std::thread::sleep(Duration::from_millis(delay as u64));
-        // }
-
-        //Ok(Primitive::Unit)
     }
 }
 /// Api description
@@ -85,9 +84,20 @@ pub fn api_description(
             "environ(string) -> struct | string, takes an optional key, return environment variable(s)"
                 .into(),
         )),
-        ("sleep".into(),
+        ("delay".into(),
         Primitive::String(
-            "sleep(int) -> () | sleep for a specified amount of time."
+            r#"delay(int, function, ctx) -> () | sleep for a specified amount of time. 
+            Takes optional function and immutable context (struct) as callback.
+            e.g : 
+               f = () => {
+                    e = process.environ("WEZTERM_PANE")
+                    if(e!= null) {
+                        println("found env: " + e)
+                    }
+               }
+               s = struct {}
+               process.delay(1000, f, s)
+               "#
                 .into(),
         )),
     ])))
