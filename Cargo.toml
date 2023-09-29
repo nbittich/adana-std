@@ -3,7 +3,7 @@ members = ["fs", "io", "process"]
 resolver = "2"
 
 [workspace.dependencies]
-adana-script-core = "0.14.1"
+adana-script-core = "0.14.2"
 anyhow = "1.0.75"
 
 
