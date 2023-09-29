@@ -98,7 +98,7 @@ pub fn api_description(
                s = struct {}
                process.delay(1000, f, s)
                "#
-                .into(),
+            .into(),
         )),
     ])))
 }
