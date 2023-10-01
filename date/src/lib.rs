@@ -38,6 +38,48 @@ fn make_date_time_struct(d: &NaiveDateTime) -> Primitive {
         ("leap_year".into(), Primitive::Bool(date.leap_year())),
     ]))
 }
+
+#[no_mangle]
+fn parse(mut params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunctionCallResult {
+    if params.is_empty() {
+        return Err(anyhow::anyhow!(
+            "not enough parameter. at least a string should be provided."
+        ));
+    }
+
+    let Primitive::String(s) = params.remove(1) else {
+        return Err(anyhow::anyhow!(
+            "first parameter should be the date formatted as a string"
+        ));
+    };
+
+    if !params.is_empty() {
+        let Primitive::String(ref f) = params.remove(0) else {
+            return Err(anyhow::anyhow!(
+                "second parameter (optional) should be the format as string"
+            ));
+        };
+        let date = NaiveDateTime::parse_from_str(s.as_str(), f)?;
+        Ok(make_date_time_struct(&date))
+    } else {
+        let mut date = None;
+        for format in DATE_FORMATS {
+            match NaiveDateTime::parse_from_str(s.as_str(), format) {
+                Ok(d) => {
+                    date = Some(d);
+                    break;
+                }
+                Err(_e) => {}
+            }
+        }
+        if let Some(date) = date {
+            Ok(make_date_time_struct(&date))
+        } else {
+            Err(anyhow::anyhow!("could not determine date format. {s}"))
+        }
+    }
+}
+
 #[no_mangle]
 pub fn now(_params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunctionCallResult {
     let now = Local::now().naive_local();
