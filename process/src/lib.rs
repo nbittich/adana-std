@@ -25,11 +25,17 @@ pub fn delay(mut params: Vec<Primitive>, mut compiler: Box<Compiler>) -> NativeF
     if params.is_empty() {
         Err(anyhow::anyhow!("at least one parameter must be provided"))
     } else {
-        let Primitive::Int(delay) = params.remove(0) else {
-            return Err(anyhow::anyhow!(
-                "first parameter must be the sleep duration (int)"
-            ));
+        let delay = match params.remove(0) {
+            Primitive::Int(delay) if delay >= 0 => delay as u64,
+            Primitive::U8(delay) => delay as u64,
+            Primitive::I8(delay) if delay >= 0 => delay as u64,
+            e => {
+                return Err(anyhow::anyhow!(
+                    "first parameter must be the sleep duration (int) => {e}"
+                ))
+            }
         };
+
         if params.is_empty() {
             std::thread::sleep(Duration::from_millis(delay as u64));
             Ok(Primitive::Unit)
