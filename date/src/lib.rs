@@ -33,7 +33,7 @@ fn make_date_time_struct(d: &NaiveDateTime) -> Primitive {
         ("week".into(), Primitive::U8(d.iso_week().week() as u8)),
         ("day".into(), Primitive::U8(date.day() as u8)),
         ("month".into(), Primitive::U8(date.month() as u8)),
-        ("year".into(), Primitive::U8(date.year() as u8)),
+        ("year".into(), Primitive::Int(date.year() as i128)),
         ("hour".into(), Primitive::U8(time.hour() as u8)),
         ("minute".into(), Primitive::U8(time.minute() as u8)),
         ("second".into(), Primitive::U8(time.second() as u8)),
