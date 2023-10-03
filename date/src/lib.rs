@@ -1,7 +1,9 @@
 use std::collections::BTreeMap;
 
 use adana_script_core::primitive::{Compiler, NativeFunctionCallResult, Primitive};
-use chrono::{offset::Local, Datelike, NaiveDateTime, Timelike};
+use anyhow::Context;
+use chrono::{offset::Local, Datelike, NaiveDate, NaiveDateTime, Timelike};
+
 pub static DATE_FORMATS: [&str; 9] = [
     "%Y-%m-%dT%H:%M:%S%.3f%Z",
     "%Y-%m-%dT%H:%M:%S%Z",
@@ -40,6 +42,69 @@ fn make_date_time_struct(d: &NaiveDateTime) -> Primitive {
 }
 
 #[no_mangle]
+fn from(mut params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunctionCallResult {
+    if params.len() < 3 {
+        return Err(anyhow::anyhow!(
+            "not enough parameters. at least year, month, day must be provided"
+        ));
+    }
+    let get_i32_from_prim = |prim| match prim {
+        Primitive::I8(n) => Ok(n as i32),
+        Primitive::U8(n) => Ok(n as i32),
+        Primitive::Int(n) => Ok(n as i32),
+        _ => Err(anyhow::anyhow!("not an int")),
+    };
+    let year = get_i32_from_prim(params.remove(0))?;
+    let month = get_i32_from_prim(params.remove(0))? as u32;
+    let day = get_i32_from_prim(params.remove(0))? as u32;
+
+    let date = {
+        let date = NaiveDate::from_ymd_opt(year, month, day).context("could not extract date")?;
+
+        if params.len() == 3 {
+            let hour = get_i32_from_prim(params.remove(0))? as u32;
+            let minute = get_i32_from_prim(params.remove(0))? as u32;
+            let second = get_i32_from_prim(params.remove(0))? as u32;
+            date.and_hms_opt(hour, minute, second)
+        } else {
+            date.and_hms_opt(0, 0, 0)
+        }
+    }
+    .context("could not make date")?;
+    Ok(make_date_time_struct(&date))
+}
+
+#[no_mangle]
+fn format(mut params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunctionCallResult {
+    if params.is_empty() {
+        return Err(anyhow::anyhow!(
+            "not enough parameter. at least a timestamp should be provided."
+        ));
+    }
+
+    let Primitive::Int(s) = params.remove(0) else {
+        return Err(anyhow::anyhow!(
+            "first parameter should be the timestamp (int)"
+        ));
+    };
+
+    let date = NaiveDateTime::from_timestamp_millis(s as i64)
+        .context("could not convert timestamp to date")?;
+    if !params.is_empty() {
+        let Primitive::String(ref f) = params.remove(0) else {
+            return Err(anyhow::anyhow!(
+                "second parameter (optional) should be the format as string"
+            ));
+        };
+        let res = date.format(f).to_string();
+        Ok(Primitive::String(res))
+    } else {
+        let res = date.format(DATE_FORMATS[0]).to_string();
+        Ok(Primitive::String(res))
+    }
+}
+
+#[no_mangle]
 fn parse(mut params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunctionCallResult {
     if params.is_empty() {
         return Err(anyhow::anyhow!(
@@ -47,7 +112,7 @@ fn parse(mut params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunction
         ));
     }
 
-    let Primitive::String(s) = params.remove(1) else {
+    let Primitive::String(s) = params.remove(0) else {
         return Err(anyhow::anyhow!(
             "first parameter should be the date formatted as a string"
         ));
@@ -84,6 +149,42 @@ fn parse(mut params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunction
 pub fn now(_params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunctionCallResult {
     let now = Local::now().naive_local();
     Ok(make_date_time_struct(&now))
+}
+
+/// Api description
+#[no_mangle]
+pub fn api_description(
+    _params: Vec<Primitive>,
+    _compiler: Box<Compiler>,
+) -> NativeFunctionCallResult {
+    Ok(Primitive::Struct(BTreeMap::from([
+        (
+            "from".into(),
+            Primitive::String(
+                r#"from(year, month, day, [hour, min, sec]) -> struct | 
+                construct a date struct from year month day"#
+                    .into(),
+            ),
+        ),
+        (
+            "format".into(),
+            Primitive::String(
+                "format(timestamp_millis, [format]) -> string | format a timestamp".into(),
+            ),
+        ),
+        (
+            "parse".into(),
+            Primitive::String(
+                r#"parse(date_str, [format]) -> struct | 
+            parse a date string. optional format can be provided"#
+                    .into(),
+            ),
+        ),
+        (
+            "now".into(),
+            Primitive::String("now() -> struct | return current date struct ".into()),
+        ),
+    ])))
 }
 
 #[cfg(test)]
