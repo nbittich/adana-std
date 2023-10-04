@@ -1,17 +1,16 @@
-use std::collections::BTreeMap;
-
 use adana_script_core::primitive::{Compiler, NativeFunctionCallResult, Primitive};
 use anyhow::Context;
 use chrono::{offset::Local, Datelike, NaiveDate, NaiveDateTime, Timelike};
+use std::collections::BTreeMap;
+use std::fmt::Write;
 
-pub static DATE_FORMATS: [&str; 9] = [
-    "%Y-%m-%dT%H:%M:%S%.3f%Z",
-    "%Y-%m-%dT%H:%M:%S%Z",
-    "%Y-%m-%d%:z",
+pub static DATE_FORMATS: [&str; 8] = [
+    "%d/%m/%Y %H:%M:%S",
+    "%Y-%m-%d %H:%M:%S",
+    "%d-%m-%Y %H:%M:%S",
     "%Y-%m-%d",
     "%d-%m-%Y",
     "%Y-%d-%m",
-    "%m-%d-%Y",
     "%m/%d/%Y",
     "%d/%m/%Y",
 ];
@@ -96,10 +95,12 @@ fn format(mut params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunctio
                 "second parameter (optional) should be the format as string"
             ));
         };
-        let res = date.format(f).to_string();
+        let mut res = String::new();
+        write!(res, "{}", date.format(f))?;
         Ok(Primitive::String(res))
     } else {
-        let res = date.format(DATE_FORMATS[0]).to_string();
+        let mut res = String::new();
+        write!(res, "{}", date.format(DATE_FORMATS[0]))?;
         Ok(Primitive::String(res))
     }
 }
@@ -189,13 +190,19 @@ pub fn api_description(
 
 #[cfg(test)]
 mod test {
+    use adana_script_core::primitive::Primitive;
     use chrono::Local;
 
-    use crate::make_date_time_struct;
+    use crate::format;
 
     #[test]
     fn check_str() {
         let now = Local::now().naive_local();
-        dbg!(make_date_time_struct(&now));
+        let r = format(
+            vec![Primitive::Int(now.timestamp_millis() as i128)],
+            Box::new(|_, _| Ok(Primitive::Unit)),
+        )
+        .unwrap();
+        dbg!(r);
     }
 }
