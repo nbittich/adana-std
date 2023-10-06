@@ -12,6 +12,7 @@ version = "0.0.5"
 authors = ["Nordine Bittich"]
 description = "Adana standard library"
 documentation = "https://github.com/nbittich/adana-std"
+repository = "https://github.com/nbittich/adana-std"
 rust-version = "1.73"
 edition = "2021"
 license = "MIT"
