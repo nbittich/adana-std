@@ -10,4 +10,4 @@ crate-type = ["dylib"]
 [dependencies]
 adana-script-core = { workspace = true }
 anyhow = { workspace = true }
-chrono = { workspace = true, features = ["rustc-serialize"] }
+chrono = { workspace = true }
