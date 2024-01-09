@@ -3,8 +3,8 @@ members = ["fs", "io", "process", "date"]
 resolver = "2"
 
 [workspace.dependencies]
-adana-script-core = "0.15.1"
-anyhow = "1.0.75"
+adana-script-core = "0.16.0"
+anyhow = "1.0.79"
 chrono = "0.4.31"
 
 [workspace.package]
@@ -13,7 +13,7 @@ authors = ["Nordine Bittich"]
 description = "Adana standard library"
 documentation = "https://github.com/nbittich/adana-std"
 repository = "https://github.com/nbittich/adana-std"
-rust-version = "1.73"
+rust-version = "1.75"
 edition = "2021"
 license = "MIT"
 
