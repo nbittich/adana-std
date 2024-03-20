@@ -1,5 +1,6 @@
 use adana_script_core::primitive::{Compiler, NativeFunctionCallResult, Primitive};
 use anyhow::Context;
+use chrono::DateTime;
 use chrono::{offset::Local, Datelike, NaiveDate, NaiveDateTime, Timelike};
 use std::collections::BTreeMap;
 use std::fmt::Write;
@@ -23,7 +24,7 @@ fn make_date_time_struct(d: &NaiveDateTime) -> Primitive {
     Primitive::Struct(BTreeMap::from([
         (
             "timestamp".into(),
-            Primitive::Int(d.timestamp_millis() as i128),
+            Primitive::Int(d.and_utc().timestamp_millis() as i128),
         ),
         (
             "weekDay".into(),
@@ -87,8 +88,8 @@ fn format(mut params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunctio
         ));
     };
 
-    let date = NaiveDateTime::from_timestamp_millis(s as i64)
-        .context("could not convert timestamp to date")?;
+    let date =
+        DateTime::from_timestamp_millis(s as i64).context("could not convert timestamp to date")?;
     if !params.is_empty() {
         let Primitive::String(ref f) = params.remove(0) else {
             return Err(anyhow::anyhow!(
@@ -199,7 +200,7 @@ mod test {
     fn check_str() {
         let now = Local::now().naive_local();
         let r = format(
-            vec![Primitive::Int(now.timestamp_millis() as i128)],
+            vec![Primitive::Int(now.and_utc().timestamp_millis() as i128)],
             Box::new(|_, _| Ok(Primitive::Unit)),
         )
         .unwrap();

@@ -3,12 +3,12 @@ members = ["fs", "io", "process", "date"]
 resolver = "2"
 
 [workspace.dependencies]
-adana-script-core = "0.17.3"
-anyhow = "1.0.79"
-chrono = "0.4.34"
+adana-script-core = "0.17.6"
+anyhow = "1.0.81"
+chrono = "0.4.35"
 
 [workspace.package]
-version = "0.17.0"
+version = "0.17.6"
 authors = ["Nordine Bittich"]
 description = "Adana standard library"
 documentation = "https://github.com/nbittich/adana-std"
