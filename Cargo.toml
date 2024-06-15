@@ -4,7 +4,7 @@ resolver = "2"
 
 [workspace.dependencies]
 adana-script-core = "0.17.9"
-anyhow = "1.0.82"
+anyhow = "1.0.86"
 chrono = "0.4.38"
 
 [workspace.package]
@@ -13,7 +13,7 @@ authors = ["Nordine Bittich"]
 description = "Adana standard library"
 documentation = "https://github.com/nbittich/adana-std"
 repository = "https://github.com/nbittich/adana-std"
-rust-version = "1.78"
+rust-version = "1.79"
 edition = "2021"
 license = "MIT"
 
