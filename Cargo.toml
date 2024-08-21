@@ -10,6 +10,7 @@ anyhow = "1.0.86"
 chrono = "0.4.38"
 url = "2.5.2"
 multipart2 = "0.18.0"
+form_urlencoded = "1.2.1"
 [workspace.package]
 
 authors = ["Nordine Bittich"]

@@ -11,6 +11,7 @@ use std::{
 };
 const APPLICATION_JSON: &str = "application/json";
 const MULTIPART_FORM_DATA: &str = "multipart/form-data";
+const FORM_URL_ENCODED: &str = "application/x-www-form-urlencoded";
 
 use adana_script_core::{
     primitive::{Compiler, Json, LibData, NativeFunctionCallResult, Primitive},
@@ -201,6 +202,7 @@ fn request_to_primitive<'a, 'b>(
         ("headers".to_string(), headers),
         ("query".to_string(), query_params),
         ("body".to_string(), Primitive::Null),
+        ("form".to_string(), Primitive::Null),
         ("path".to_string(), path),
         ("method".to_string(), method),
         ("params".to_string(), Primitive::Struct(path_variables)),
@@ -240,8 +242,15 @@ fn request_to_primitive<'a, 'b>(
             };
         }
         req_p.insert("form".to_string(), Primitive::Struct(body));
+    } else if ct == Some(FORM_URL_ENCODED.to_string()) {
+        let mut data = String::new();
+        let mut body = BTreeMap::new();
+        req.as_reader().read_to_string(&mut data)?;
+        for (k, v) in form_urlencoded::parse(data.as_bytes()).into_owned() {
+            body.insert(k, Primitive::String(v));
+        }
+        req_p.insert("form".to_string(), Primitive::Struct(body));
     };
-    if ct == Some("".to_string()) {}
 
     Ok((Primitive::Struct(req_p), middleware))
 }
