@@ -1,14 +1,15 @@
 [workspace]
-members = ["fs", "io", "process", "date", "server"]
+members = ["fs", "io", "process", "date", "http"]
 resolver = "2"
 
 [workspace.dependencies]
 #adana-script-core = "0.17.11"
-adana-script-core = { git = "https://github.com/nbittich/adana.git", branch = "feature/raw-pointer" }
+adana-script-core = { git = "https://github.com/nbittich/adana.git", branch = "feature/multidepth" }
 tiny_http = "0.12.0"
 anyhow = "1.0.86"
 chrono = "0.4.38"
-
+url = "2.5.2"
+multipart2 = "0.18.0"
 [workspace.package]
 
 authors = ["Nordine Bittich"]

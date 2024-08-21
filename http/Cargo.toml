@@ -16,3 +16,5 @@ crate-type = ["dylib"]
 adana-script-core = { workspace = true }
 anyhow = { workspace = true }
 tiny_http = { workspace = true }
+url = { workspace = true }
+multipart2 = { workspace = true, features = ["tiny_http"] }
