@@ -1,5 +1,5 @@
 [package]
-name = "adana-std-server"
+name = "adana-std-http"
 version = { workspace = true }
 edition = { workspace = true }
 description = { workspace = true }

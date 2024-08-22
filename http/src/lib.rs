@@ -12,9 +12,10 @@ use std::{
 const APPLICATION_JSON: &str = "application/json";
 const MULTIPART_FORM_DATA: &str = "multipart/form-data";
 const FORM_URL_ENCODED: &str = "application/x-www-form-urlencoded";
-
+const ACCEPT: &str = "Accept";
+const CONTENT_TYPE: &str = "Content-Type";
 use adana_script_core::{
-    primitive::{Compiler, Json, LibData, NativeFunctionCallResult, Primitive},
+    primitive::{Compiler, Json, LibData, NativeFunctionCallResult, Primitive, ToNumber},
     Value,
 };
 use anyhow::anyhow;
@@ -32,7 +33,7 @@ pub enum PathSegment {
 }
 pub struct Middleware {
     path_segments: Vec<PathSegment>,
-    function: Vec<Value>,
+    function: Value,
     method: Method,
 }
 pub struct HttpHandle {
@@ -59,19 +60,19 @@ pub fn new(params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunctionCa
 }
 
 #[no_mangle]
-pub fn start(mut params: Vec<Primitive>, compiler: Box<Compiler>) -> NativeFunctionCallResult {
+pub fn start(mut params: Vec<Primitive>, mut compiler: Box<Compiler>) -> NativeFunctionCallResult {
     if params.len() != 3 {
         return Err(anyhow::anyhow!(
-            "invalid param (e.g start(server, middlewares, ctx))"
+            "invalid param (e.g start(server, settings, ctx))"
         ));
     }
 
     let Primitive::LibData(lib_data) = params.remove(0) else {
         return Err(anyhow::anyhow!("first param must be the http server"));
     };
-    let Primitive::Array(middlewares) = params.remove(1) else {
+    let Primitive::Struct(mut settings) = params.remove(0) else {
         return Err(anyhow::anyhow!(
-            "second param must be an array of middlewares"
+            r#"second param must be an array of settings (e.g struct {{static: {{}}, middlewares []}})"#
         ));
     };
     let Primitive::Struct(ctx) = params.remove(0) else {
@@ -79,7 +80,21 @@ pub fn start(mut params: Vec<Primitive>, compiler: Box<Compiler>) -> NativeFunct
             "third parameter must be the context (struct)"
         ));
     };
+    let Some(Primitive::Array(middlewares)) = settings.remove("middlewares") else {
+        return Err(anyhow!("missing middlewares in settings"));
+    };
 
+    // todo serve statics
+    let statics = if let Some(Primitive::Array(statics)) = settings.remove("static") {
+        statics
+    } else {
+        vec![]
+    };
+
+    let ctx = ctx
+        .into_iter()
+        .map(|(k, v)| (k, v.ref_prim()))
+        .collect::<BTreeMap<_, _>>();
     let middlewares = compile_middlewares(middlewares)?;
 
     let (tx, rx) = mpsc::channel();
@@ -101,7 +116,14 @@ pub fn start(mut params: Vec<Primitive>, compiler: Box<Compiler>) -> NativeFunct
                 {
                     let (req, middleware) = request_to_primitive(&mut request, &middlewares)?;
                     if let Some(middleware) = middleware {
-                        todo!()
+                        let res = compiler(
+                            Value::FunctionCall {
+                                parameters: Box::new(Value::BlockParen(vec![req.to_value()?])),
+                                function: Box::new(middleware.function.clone()),
+                            },
+                            ctx.clone(),
+                        )?;
+                        handle_response(request, &res)?;
                     } else {
                         request
                             .respond(Response::from_string("NOT FOUND").with_status_code(404))
@@ -121,14 +143,123 @@ pub fn start(mut params: Vec<Primitive>, compiler: Box<Compiler>) -> NativeFunct
     }))
 }
 
-fn get_content_type(req: &Request) -> Option<String> {
+fn handle_response(req: Request, res: &Primitive) -> anyhow::Result<()> {
+    match res {
+        Primitive::Ref(r) => {
+            let r = r
+                .read()
+                .map_err(|e| anyhow!("could not acquire lock {e}"))?;
+            handle_response(req, &r)
+        }
+        Primitive::EarlyReturn(s) => handle_response(req, s),
+        Primitive::Error(_) => {
+            let response = Response::from_string(format!("Error: {res:?}")).with_status_code(400);
+            req.respond(response)
+                .map_err(|e| anyhow!("cannot respond {e}"))
+        }
+
+        Primitive::String(s) => {
+            let mut response = Response::from_string(s);
+            if let Some(accept) = get_header(&req, ACCEPT) {
+                response.add_header(make_header(CONTENT_TYPE, &accept)?);
+            }
+            req.respond(response)
+                .map_err(|e| anyhow!("cannot respond {e}"))
+        }
+        v @ Primitive::Array(_)
+            if get_header(&req, ACCEPT) == Some(APPLICATION_JSON.to_string())
+                || get_content_type(&req) == Some(APPLICATION_JSON.to_string()) =>
+        {
+            let mut response = Response::from_string(v.to_json()?);
+            response.add_header(make_header(CONTENT_TYPE, APPLICATION_JSON)?);
+            req.respond(response)
+                .map_err(|e| anyhow!("cannot respond {e}"))
+        }
+        Primitive::NativeLibrary(_)
+        | Primitive::NativeFunction(_, _)
+        | Primitive::LibData(_)
+        | Primitive::Function { .. }
+        | Primitive::U8(_)
+        | Primitive::I8(_)
+        | Primitive::Int(_)
+        | Primitive::Bool(_)
+        | Primitive::Null
+        | Primitive::Double(_)
+        | Primitive::Array(_)
+        | Primitive::NoReturn => {
+            let response = Response::from_string(format!("SERVER ERROR: BAD RETURN {res:?}"))
+                .with_status_code(500);
+            req.respond(response)
+                .map_err(|e| anyhow!("cannot respond {e}"))
+        }
+
+        Primitive::Unit => {
+            let response = Response::from_string("").with_status_code(200);
+            req.respond(response)
+                .map_err(|e| anyhow!("cannot respond {e}"))
+        }
+        Primitive::Struct(res) => {
+            let Some(status) = res.get("status") else {
+                return Err(anyhow!("missing status in response (e.g 200)"));
+            };
+
+            let Some(body) = res.get("body") else {
+                return Err(anyhow!("missing body in response"));
+            };
+
+            let headers = if let Some(Primitive::Struct(headers)) = res.get("headers") {
+                headers.clone()
+            } else {
+                BTreeMap::new()
+            };
+            let ct = if let Some(ct) = headers.iter().find_map(|h| {
+                if h.0.eq_ignore_ascii_case(CONTENT_TYPE) {
+                    Some(h.1.to_string())
+                } else {
+                    None
+                }
+            }) {
+                ct
+            } else if let Some(ct) = get_content_type(&req).or(get_header(&req, ACCEPT)) {
+                ct
+            } else {
+                "text/html".to_string()
+            };
+            let body = if &ct == APPLICATION_JSON {
+                body.to_json()?
+            } else {
+                body.to_string()
+            };
+            let status = if let Primitive::Int(n) = status.to_int() {
+                n as u16
+            } else {
+                200
+            };
+
+            let mut response = Response::from_string(body).with_status_code(status);
+            for h in headers.iter().map(|(k, v)| make_header(k, &v.to_string())) {
+                response.add_header(h?);
+            }
+            req.respond(response)
+                .map_err(|e| anyhow!("cannot respond {e}"))
+        }
+    }
+}
+fn make_header(k: &str, v: &str) -> anyhow::Result<tiny_http::Header> {
+    tiny_http::Header::from_str(format!("{k}:{v}").as_str())
+        .map_err(|e| anyhow!("bad header {v}: {e:?}"))
+}
+fn get_header(req: &Request, header_name: &'static str) -> Option<String> {
     req.headers().iter().find_map(|h| {
-        if h.field.equiv("Content-Type") {
+        if h.field.equiv(header_name) {
             Some(h.field.to_string())
         } else {
             None
         }
     })
+}
+fn get_content_type(req: &Request) -> Option<String> {
+    get_header(req, CONTENT_TYPE)
 }
 
 fn request_to_primitive<'a, 'b>(
@@ -314,7 +445,7 @@ fn compile_middlewares(middlewares: Vec<Primitive>) -> anyhow::Result<Vec<Middle
 
                 Ok(Middleware {
                     path_segments: segments,
-                    function: exprs,
+                    function: Primitive::Function { parameters, exprs }.to_value()?,
                     method: Method::from_str(&method).map_err(|e| anyhow!("bad method {e:?}"))?,
                 })
             }
