@@ -15,7 +15,9 @@ const FORM_URL_ENCODED: &str = "application/x-www-form-urlencoded";
 const ACCEPT: &str = "Accept";
 const CONTENT_TYPE: &str = "Content-Type";
 use adana_script_core::{
-    primitive::{Compiler, Json, LibData, NativeFunctionCallResult, Primitive, ToNumber},
+    primitive::{
+        Compiler, Json, LibData, NativeFunctionCallResult, Primitive, RefPrimitive, ToNumber,
+    },
     Value,
 };
 use anyhow::anyhow;
@@ -26,11 +28,13 @@ pub struct HttpServer {
     server: Server,
     server_addr: String,
 }
+#[derive(Debug)]
 pub enum PathSegment {
     Root,
     String(String),
     Variable { position: usize, name: String },
 }
+#[derive(Debug)]
 pub struct Middleware {
     path_segments: Vec<PathSegment>,
     function: Value,
@@ -105,29 +109,21 @@ pub fn start(mut params: Vec<Primitive>, mut compiler: Box<Compiler>) -> NativeF
             loop {
                 let shutdown = rx.try_recv().ok().unwrap_or(false);
                 if shutdown {
+                    println!("server shutting down");
                     return Ok(());
                 }
-                if let Some(mut request) = server
+                if let Some(request) = server
                     .server
                     .recv_timeout(Duration::from_millis(50)) // fixme the duration could be a
                     // parameter
                     .ok()
                     .flatten()
                 {
-                    let (req, middleware) = request_to_primitive(&mut request, &middlewares)?;
-                    if let Some(middleware) = middleware {
-                        let res = compiler(
-                            Value::FunctionCall {
-                                parameters: Box::new(Value::BlockParen(vec![req.to_value()?])),
-                                function: Box::new(middleware.function.clone()),
-                            },
-                            ctx.clone(),
-                        )?;
-                        handle_response(request, &res)?;
-                    } else {
-                        request
-                            .respond(Response::from_string("NOT FOUND").with_status_code(404))
-                            .map_err(|e| anyhow!("could not respond: {e}"))?;
+                    match handle_request(request, &middlewares, &mut compiler, ctx.clone()) {
+                        Ok(_) => (),
+                        Err(e) => {
+                            println!("could not process request. {e:?}")
+                        }
                     }
                 }
             }
@@ -141,6 +137,38 @@ pub fn start(mut params: Vec<Primitive>, mut compiler: Box<Compiler>) -> NativeF
             tx: Arc::new(tx),
         })),
     }))
+}
+
+fn handle_request(
+    mut request: Request,
+    middlewares: &[Middleware],
+    compiler: &mut Box<Compiler>,
+    ctx: BTreeMap<String, RefPrimitive>,
+) -> anyhow::Result<()> {
+    let (req, middleware) = match request_to_primitive(&mut request, &middlewares) {
+        Ok((r, m)) => (r, m),
+        Err(e) => {
+            println!("err {e:?}");
+            return Err(e);
+        }
+    };
+
+    if let Some(middleware) = middleware {
+        let res = compiler(
+            Value::FunctionCall {
+                parameters: Box::new(Value::BlockParen(vec![req.to_value()?])),
+                function: Box::new(middleware.function.clone()),
+            },
+            ctx,
+        )?;
+        handle_response(request, &res)?;
+    } else {
+        println!("{middlewares:?}"); // NORDINE
+        request
+            .respond(Response::from_string("NOT FOUND").with_status_code(404))
+            .map_err(|e| anyhow!("could not respond: {e}"))?;
+    }
+    Ok(())
 }
 
 fn handle_response(req: Request, res: &Primitive) -> anyhow::Result<()> {
@@ -267,7 +295,15 @@ fn request_to_primitive<'a, 'b>(
     middlewares: &'a [Middleware],
 ) -> anyhow::Result<(Primitive, Option<&'a Middleware>)> {
     let headers = headers_to_primitive(req.headers());
-    let url = Url::parse(req.url())?;
+
+    let url = match Url::parse(req.url()) {
+        Ok(url) => Ok(url),
+        Err(url::ParseError::RelativeUrlWithoutBase) => {
+            let url = Url::parse("http://dummy.com")?;
+            url.join(req.url())
+        }
+        e @ Err(_) => e,
+    }?;
     let query_params = Primitive::Struct(
         url.query_pairs()
             .map(|(k, v)| (k.to_string(), Primitive::String(v.to_string())))
@@ -276,24 +312,31 @@ fn request_to_primitive<'a, 'b>(
     let path = Primitive::String(url.path().to_string());
     let (path_variables, middleware) = {
         let path_segments = if url.path() == "/" || url.path().is_empty() {
+            vec![PathSegment::Root]
+        } else {
             url.path()
                 .split('/')
                 .filter(|p| !p.is_empty())
                 .map(|s| PathSegment::String(s.to_string()))
                 .collect::<Vec<_>>()
-        } else {
-            vec![PathSegment::Root]
         };
+        println!("{path_segments:?}"); // NORDINE
 
         let mut res = (BTreeMap::new(), None);
+
         // determine which middleware
         'middlewareLoop: for middleware in middlewares {
+            res.1 = None;
             if &middleware.method != req.method() {
                 continue 'middlewareLoop;
             }
             if middleware.path_segments.len() == path_segments.len() {
+                println!(
+                    "goes here {path_segments:?} => {:?}",
+                    middleware.path_segments
+                ); // NORDINE
                 for (segment_from_req, segment_from_middleware) in
-                    middleware.path_segments.iter().zip(path_segments.iter())
+                    path_segments.iter().zip(middleware.path_segments.iter())
                 {
                     match (segment_from_req, segment_from_middleware) {
                         (PathSegment::Root, PathSegment::Root) => {
@@ -302,13 +345,18 @@ fn request_to_primitive<'a, 'b>(
                         }
                         (PathSegment::Root, PathSegment::String(_))
                         | (PathSegment::Root, PathSegment::Variable { .. })
-                        | (PathSegment::String(_), PathSegment::Root) => continue 'middlewareLoop,
+                        | (PathSegment::String(_), PathSegment::Root) => {
+                            continue 'middlewareLoop;
+                        }
                         (PathSegment::String(s), PathSegment::String(s2)) => {
                             if s != s2 {
                                 continue 'middlewareLoop;
+                            } else {
+                                res.1 = Some(middleware);
                             }
                         }
                         (PathSegment::String(value), PathSegment::Variable { name, .. }) => {
+                            res.1 = Some(middleware);
                             res.0
                                 .insert(name.to_string(), Primitive::String(value.to_string()));
                         }
@@ -317,8 +365,12 @@ fn request_to_primitive<'a, 'b>(
                         }
                     }
                 }
+                if res.1.is_some() {
+                    break 'middlewareLoop;
+                }
             }
         }
+
         res
     };
 

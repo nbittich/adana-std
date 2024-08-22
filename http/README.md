@@ -9,10 +9,10 @@ settings = struct {
    static: struct {},
    middlewares: [
       struct {
-      	path: "/",
+      	path: "/hello",
       	handler: (req) => {
-      	    println(req)
-      	    "hello bro!"
+            println(req)
+      	    return "hello bro!"
       	},
         method: "GET"
       }
