@@ -163,7 +163,6 @@ fn handle_request(
         )?;
         handle_response(request, &res)?;
     } else {
-        println!("{middlewares:?}"); // NORDINE
         request
             .respond(Response::from_string("NOT FOUND").with_status_code(404))
             .map_err(|e| anyhow!("could not respond: {e}"))?;
@@ -320,7 +319,6 @@ fn request_to_primitive<'a, 'b>(
                 .map(|s| PathSegment::String(s.to_string()))
                 .collect::<Vec<_>>()
         };
-        println!("{path_segments:?}"); // NORDINE
 
         let mut res = (BTreeMap::new(), None);
 
@@ -331,10 +329,6 @@ fn request_to_primitive<'a, 'b>(
                 continue 'middlewareLoop;
             }
             if middleware.path_segments.len() == path_segments.len() {
-                println!(
-                    "goes here {path_segments:?} => {:?}",
-                    middleware.path_segments
-                ); // NORDINE
                 for (segment_from_req, segment_from_middleware) in
                     path_segments.iter().zip(middleware.path_segments.iter())
                 {

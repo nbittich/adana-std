@@ -9,11 +9,23 @@ settings = struct {
    static: struct {},
    middlewares: [
       struct {
-      	path: "/hello",
+      	path: "/hello/:name",
+      	handler: (req) => {
+            println(req)
+      	    return struct {
+              status: 200,
+              body: struct { response: """hello ${req.params.name}!""" },
+              headers: struct { "Content-Type": "application/json"}
+            }
+      	},
+        method: "GET"
+      },
+      struct {
+      	path: "/",
       	handler: (req) => {
             println(req)
       	    return "hello bro!"
-      	},
+      },
         method: "GET"
       }
    ]
