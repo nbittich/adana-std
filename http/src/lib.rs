@@ -1,6 +1,8 @@
 use std::{
     collections::BTreeMap,
+    fs::File,
     io::Read,
+    path::PathBuf,
     str::FromStr,
     sync::{
         mpsc::{self, Sender},
@@ -40,6 +42,12 @@ pub struct Middleware {
     function: Value,
     method: Method,
 }
+#[derive(Debug)]
+pub struct StaticServe {
+    path: String,
+    file_path: String,
+}
+
 pub struct HttpHandle {
     handle: Arc<Mutex<Option<JoinHandle<anyhow::Result<()>>>>>,
     tx: Arc<Sender<bool>>,
@@ -95,6 +103,8 @@ pub fn start(mut params: Vec<Primitive>, mut compiler: Box<Compiler>) -> NativeF
         vec![]
     };
 
+    let statics = compile_statics(statics)?;
+
     let ctx = ctx
         .into_iter()
         .map(|(k, v)| (k, v.ref_prim()))
@@ -119,7 +129,13 @@ pub fn start(mut params: Vec<Primitive>, mut compiler: Box<Compiler>) -> NativeF
                     .ok()
                     .flatten()
                 {
-                    match handle_request(request, &middlewares, &mut compiler, ctx.clone()) {
+                    match handle_request(
+                        request,
+                        &middlewares,
+                        &statics,
+                        &mut compiler,
+                        ctx.clone(),
+                    ) {
                         Ok(_) => (),
                         Err(e) => {
                             println!("could not process request. {e:?}")
@@ -142,6 +158,7 @@ pub fn start(mut params: Vec<Primitive>, mut compiler: Box<Compiler>) -> NativeF
 fn handle_request(
     mut request: Request,
     middlewares: &[Middleware],
+    statics: &[StaticServe],
     compiler: &mut Box<Compiler>,
     ctx: BTreeMap<String, RefPrimitive>,
 ) -> anyhow::Result<()> {
@@ -163,9 +180,30 @@ fn handle_request(
         )?;
         handle_response(request, &res)?;
     } else {
-        request
-            .respond(Response::from_string("NOT FOUND").with_status_code(404))
-            .map_err(|e| anyhow!("could not respond: {e}"))?;
+        let url = extract_path_from_url(&request)?;
+        if let Some(st) = statics.iter().find(|s| url.path().starts_with(&s.path)) {
+            let mut p = PathBuf::from(url.path().replace(&st.path, &st.file_path));
+            if p.is_dir() {
+                p.push("index.html"); // if it's a dir, index.html
+            }
+
+            match File::open(p) {
+                Ok(f) => {
+                    request
+                        .respond(Response::from_file(f))
+                        .map_err(|e| anyhow!("could not respond: {e}"))?;
+                }
+                Err(_) => {
+                    request
+                        .respond(Response::from_string("NOT FOUND").with_status_code(404))
+                        .map_err(|e| anyhow!("could not respond: {e}"))?;
+                }
+            }
+        } else {
+            request
+                .respond(Response::from_string("NOT FOUND").with_status_code(404))
+                .map_err(|e| anyhow!("could not respond: {e}"))?;
+        }
     }
     Ok(())
 }
@@ -289,12 +327,7 @@ fn get_content_type(req: &Request) -> Option<String> {
     get_header(req, CONTENT_TYPE)
 }
 
-fn request_to_primitive<'a, 'b>(
-    req: &'b mut Request,
-    middlewares: &'a [Middleware],
-) -> anyhow::Result<(Primitive, Option<&'a Middleware>)> {
-    let headers = headers_to_primitive(req.headers());
-
+fn extract_path_from_url(req: &Request) -> anyhow::Result<Url> {
     let url = match Url::parse(req.url()) {
         Ok(url) => Ok(url),
         Err(url::ParseError::RelativeUrlWithoutBase) => {
@@ -303,6 +336,16 @@ fn request_to_primitive<'a, 'b>(
         }
         e @ Err(_) => e,
     }?;
+    Ok(url)
+}
+
+fn request_to_primitive<'a, 'b>(
+    req: &'b mut Request,
+    middlewares: &'a [Middleware],
+) -> anyhow::Result<(Primitive, Option<&'a Middleware>)> {
+    let headers = headers_to_primitive(req.headers());
+
+    let url = extract_path_from_url(req)?;
     let query_params = Primitive::Struct(
         url.query_pairs()
             .map(|(k, v)| (k.to_string(), Primitive::String(v.to_string())))
@@ -443,6 +486,22 @@ fn headers_to_primitive(headers: &[Header]) -> Primitive {
     Primitive::Struct(prim_headers)
 }
 
+fn compile_statics(statics: Vec<Primitive>) -> anyhow::Result<Vec<StaticServe>> {
+    let mut static_serve = Vec::with_capacity(statics.len());
+    for st in statics {
+        let Primitive::Struct(mut st) = st else {
+            return Err(anyhow!("bad static {st}"));
+        };
+        let Some(Primitive::String(path)) = st.remove("path") else {
+            return Err(anyhow!("missing path in static"));
+        };
+        let Some(Primitive::String(file_path)) = st.remove("file_path") else {
+            return Err(anyhow!("missing file_path in static"));
+        };
+        static_serve.push(StaticServe { path, file_path });
+    }
+    Ok(static_serve)
+}
 fn compile_middlewares(middlewares: Vec<Primitive>) -> anyhow::Result<Vec<Middleware>> {
     fn compile_middleware(middleware: Primitive) -> anyhow::Result<Middleware> {
         match middleware {
