@@ -217,11 +217,18 @@ fn handle_response(req: Request, res: &Primitive) -> anyhow::Result<()> {
             handle_response(req, &r)
         }
         Primitive::EarlyReturn(s) => handle_response(req, s),
-        v @ Primitive::Error(_) => {
+        Primitive::Error(s) => {
             if get_header(&req, ACCEPT) == Some(APPLICATION_JSON.to_string())
                 || get_content_type(&req) == Some(APPLICATION_JSON.to_string())
             {
-                let mut response = Response::from_string(v.to_json()?).with_status_code(400);
+                let mut response = Response::from_string(
+                    Primitive::Struct(BTreeMap::from([(
+                        "error".to_string(),
+                        Primitive::String(s.to_string()),
+                    )]))
+                    .to_json()?,
+                )
+                .with_status_code(400);
                 response.add_header(make_header(CONTENT_TYPE, APPLICATION_JSON)?);
                 req.respond(response)
                     .map_err(|e| anyhow!("cannot respond {e}"))
