@@ -84,7 +84,7 @@ pub fn start(mut params: Vec<Primitive>, mut compiler: Box<Compiler>) -> NativeF
     };
     let Primitive::Struct(mut settings) = params.remove(0) else {
         return Err(anyhow::anyhow!(
-            r#"second param must be an array of settings (e.g struct {{static: {{}}, middlewares []}})"#
+            r#"second param must be an array of settings (e.g struct {{static: [], middlewares []}})"#
         ));
     };
     let Primitive::Struct(ctx) = params.remove(0) else {
@@ -109,6 +109,7 @@ pub fn start(mut params: Vec<Primitive>, mut compiler: Box<Compiler>) -> NativeF
         .into_iter()
         .map(|(k, v)| (k, v.ref_prim()))
         .collect::<BTreeMap<_, _>>();
+    dbg!(&ctx);
     let middlewares = compile_middlewares(middlewares)?;
 
     let (tx, rx) = mpsc::channel();
@@ -171,6 +172,7 @@ fn handle_request(
     };
 
     if let Some(middleware) = middleware {
+        dbg!(&ctx);
         let res = compiler(
             Value::FunctionCall {
                 parameters: Box::new(Value::BlockParen(vec![req.to_value()?])),
@@ -334,7 +336,7 @@ fn make_header(k: &str, v: &str) -> anyhow::Result<tiny_http::Header> {
 fn get_header(req: &Request, header_name: &'static str) -> Option<String> {
     req.headers().iter().find_map(|h| {
         if h.field.equiv(header_name) {
-            Some(h.field.to_string())
+            Some(h.value.to_string())
         } else {
             None
         }
