@@ -96,11 +96,28 @@ pub fn start(mut params: Vec<Primitive>, mut compiler: Box<Compiler>) -> NativeF
         return Err(anyhow!("missing middlewares in settings"));
     };
 
-    // todo serve statics
     let statics = if let Some(Primitive::Array(statics)) = settings.remove("static") {
         statics
     } else {
         vec![]
+    };
+
+    let store = match settings
+        .remove("store")
+        .ok_or_else(|| anyhow!("missing store struct in settings"))?
+    {
+        Primitive::Ref(s)
+            if matches!(
+                s.read()
+                    .map_err(|e| anyhow!("could not read store {e}"))?
+                    .as_ref_ok()?,
+                Primitive::Struct(_)
+            ) =>
+        {
+            Primitive::Ref(s)
+        }
+        v @ Primitive::Struct(_) => Primitive::Ref(v.ref_prim()),
+        _ => Primitive::Ref(Primitive::Struct(BTreeMap::new()).ref_prim()),
     };
 
     let statics = compile_statics(statics)?;
@@ -136,6 +153,7 @@ pub fn start(mut params: Vec<Primitive>, mut compiler: Box<Compiler>) -> NativeF
                         &statics,
                         &mut compiler,
                         ctx.clone(),
+                        store.clone(),
                     ) {
                         Ok(_) => (),
                         Err(e) => {
@@ -162,6 +180,7 @@ fn handle_request(
     statics: &[StaticServe],
     compiler: &mut Box<Compiler>,
     ctx: BTreeMap<String, RefPrimitive>,
+    store: Primitive,
 ) -> anyhow::Result<()> {
     let (req, middleware) = match request_to_primitive(&mut request, &middlewares) {
         Ok((r, m)) => (r, m),
@@ -173,9 +192,13 @@ fn handle_request(
 
     if let Some(middleware) = middleware {
         dbg!(&ctx);
+        dbg!(&store);
         let res = compiler(
             Value::FunctionCall {
-                parameters: Box::new(Value::BlockParen(vec![req.to_value()?])),
+                parameters: Box::new(Value::BlockParen(vec![
+                    Value::Primitive(req),
+                    Value::Primitive(store),
+                ])),
                 function: Box::new(middleware.function.clone()),
             },
             ctx,
@@ -560,8 +583,10 @@ fn compile_middlewares(middlewares: Vec<Primitive>) -> anyhow::Result<Vec<Middle
                 else {
                     return Err(anyhow::anyhow!("missing handler param i middleware"));
                 };
-                if parameters.len() != 1 {
-                    return Err(anyhow!("Middleware must have exactly one parameter (req)"));
+                if parameters.len() != 2 {
+                    return Err(anyhow!(
+                        "Middleware must have exactly two parameters (req, store)"
+                    ));
                 }
                 let Some(Primitive::String(method)) = middleware.remove("method") else {
                     return Err(anyhow!("missing method"));
