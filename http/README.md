@@ -5,7 +5,6 @@
 ```
 http = require("/devdisk/sideprojects/adana-std/target/release/libadana_std_http.so")
 http_server=http.new() # listen to 8000 by default
-ctx = struct {}
 settings = struct {
    store: struct {todos: []},
    static: [
@@ -54,7 +53,7 @@ settings = struct {
       }
    ]
 }
-http_handle = http.start(http_server, settings, ctx)
+http_handle = http.start(http_server, settings)
 res =http.stop(http_handle)
 drop(http_server)
 ```

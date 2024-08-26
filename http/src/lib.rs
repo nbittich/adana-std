@@ -73,9 +73,9 @@ pub fn new(params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunctionCa
 
 #[no_mangle]
 pub fn start(mut params: Vec<Primitive>, mut compiler: Box<Compiler>) -> NativeFunctionCallResult {
-    if params.len() != 3 {
+    if params.len() != 2 {
         return Err(anyhow::anyhow!(
-            "invalid param (e.g start(server, settings, ctx))"
+            "invalid param (e.g start(server, settings))"
         ));
     }
 
@@ -87,11 +87,7 @@ pub fn start(mut params: Vec<Primitive>, mut compiler: Box<Compiler>) -> NativeF
             r#"second param must be an array of settings (e.g struct {{static: [], middlewares []}})"#
         ));
     };
-    let Primitive::Struct(ctx) = params.remove(0) else {
-        return Err(anyhow::anyhow!(
-            "third parameter must be the context (struct)"
-        ));
-    };
+
     let Some(Primitive::Array(middlewares)) = settings.remove("middlewares") else {
         return Err(anyhow!("missing middlewares in settings"));
     };
@@ -122,11 +118,6 @@ pub fn start(mut params: Vec<Primitive>, mut compiler: Box<Compiler>) -> NativeF
 
     let statics = compile_statics(statics)?;
 
-    let ctx = ctx
-        .into_iter()
-        .map(|(k, v)| (k, v.ref_prim()))
-        .collect::<BTreeMap<_, _>>();
-    dbg!(&ctx);
     let middlewares = compile_middlewares(middlewares)?;
 
     let (tx, rx) = mpsc::channel();
@@ -152,7 +143,6 @@ pub fn start(mut params: Vec<Primitive>, mut compiler: Box<Compiler>) -> NativeF
                         &middlewares,
                         &statics,
                         &mut compiler,
-                        ctx.clone(),
                         store.clone(),
                     ) {
                         Ok(_) => (),
@@ -179,7 +169,6 @@ fn handle_request(
     middlewares: &[Middleware],
     statics: &[StaticServe],
     compiler: &mut Box<Compiler>,
-    ctx: BTreeMap<String, RefPrimitive>,
     store: Primitive,
 ) -> anyhow::Result<()> {
     let (req, middleware) = match request_to_primitive(&mut request, &middlewares) {
@@ -191,8 +180,6 @@ fn handle_request(
     };
 
     if let Some(middleware) = middleware {
-        dbg!(&ctx);
-        dbg!(&store);
         let res = compiler(
             Value::FunctionCall {
                 parameters: Box::new(Value::BlockParen(vec![
@@ -201,7 +188,7 @@ fn handle_request(
                 ])),
                 function: Box::new(middleware.function.clone()),
             },
-            ctx,
+            BTreeMap::new(), // fixme extra ctx is probably no longer useful
         )?;
         handle_response(request, &res)?;
     } else {
