@@ -17,9 +17,7 @@ const FORM_URL_ENCODED: &str = "application/x-www-form-urlencoded";
 const ACCEPT: &str = "Accept";
 const CONTENT_TYPE: &str = "Content-Type";
 use adana_script_core::{
-    primitive::{
-        Compiler, Json, LibData, NativeFunctionCallResult, Primitive, RefPrimitive, ToNumber,
-    },
+    primitive::{Compiler, Json, LibData, NativeFunctionCallResult, Primitive, ToNumber},
     Value,
 };
 use anyhow::anyhow;
