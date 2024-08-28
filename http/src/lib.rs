@@ -35,7 +35,7 @@ pub enum PathSegment {
     Variable { position: usize, name: String },
 }
 #[derive(Debug)]
-pub struct Middleware {
+pub struct Route {
     path_segments: Vec<PathSegment>,
     function: Value,
     method: Method,
@@ -87,12 +87,12 @@ pub fn start(mut params: Vec<Primitive>, mut compiler: Box<Compiler>) -> NativeF
     };
     let Primitive::Struct(mut settings) = params.remove(0) else {
         return Err(anyhow::anyhow!(
-            r#"second param must be an array of settings (e.g struct {{static: [], middlewares []}})"#
+            r#"second param must be an array of settings (e.g struct {{static: [], routes []}})"#
         ));
     };
 
-    let Some(Primitive::Array(middlewares)) = settings.remove("middlewares") else {
-        return Err(anyhow!("missing middlewares in settings"));
+    let Some(Primitive::Array(routes)) = settings.remove("routes") else {
+        return Err(anyhow!("missing routes in settings"));
     };
 
     let statics = if let Some(Primitive::Array(statics)) = settings.remove("static") {
@@ -121,7 +121,7 @@ pub fn start(mut params: Vec<Primitive>, mut compiler: Box<Compiler>) -> NativeF
 
     let statics = compile_statics(statics)?;
 
-    let middlewares = compile_middlewares(middlewares)?;
+    let routes = compile_routes(routes)?;
 
     let (tx, rx) = mpsc::channel();
 
@@ -141,13 +141,7 @@ pub fn start(mut params: Vec<Primitive>, mut compiler: Box<Compiler>) -> NativeF
                     .ok()
                     .flatten()
                 {
-                    match handle_request(
-                        request,
-                        &middlewares,
-                        &statics,
-                        &mut compiler,
-                        store.clone(),
-                    ) {
+                    match handle_request(request, &routes, &statics, &mut compiler, store.clone()) {
                         Ok(_) => (),
                         Err(e) => {
                             println!("could not process request. {e:?}")
@@ -169,12 +163,12 @@ pub fn start(mut params: Vec<Primitive>, mut compiler: Box<Compiler>) -> NativeF
 
 fn handle_request(
     mut request: Request,
-    middlewares: &[Middleware],
+    routes: &[Route],
     statics: &[StaticServe],
     compiler: &mut Box<Compiler>,
     store: Primitive,
 ) -> anyhow::Result<()> {
-    let (req, middleware) = match request_to_primitive(&mut request, &middlewares) {
+    let (req, route) = match request_to_primitive(&mut request, &routes) {
         Ok((r, m)) => (r, m),
         Err(e) => {
             println!("err {e:?}");
@@ -182,14 +176,14 @@ fn handle_request(
         }
     };
 
-    if let Some(middleware) = middleware {
+    if let Some(route) = route {
         let res = compiler(
             Value::FunctionCall {
                 parameters: Box::new(Value::BlockParen(vec![
                     Value::Primitive(req),
                     Value::Primitive(store),
                 ])),
-                function: Box::new(middleware.function.clone()),
+                function: Box::new(route.function.clone()),
             },
             BTreeMap::new(), // fixme extra ctx is probably no longer useful
         )?;
@@ -396,8 +390,8 @@ fn extract_path_from_url(req: &Request) -> anyhow::Result<Url> {
 
 fn request_to_primitive<'a, 'b>(
     req: &'b mut Request,
-    middlewares: &'a [Middleware],
-) -> anyhow::Result<(Primitive, Option<&'a Middleware>)> {
+    routes: &'a [Route],
+) -> anyhow::Result<(Primitive, Option<&'a Route>)> {
     let headers = headers_to_primitive(req.headers());
 
     let url = extract_path_from_url(req)?;
@@ -407,7 +401,7 @@ fn request_to_primitive<'a, 'b>(
             .collect::<BTreeMap<_, _>>(),
     );
     let path = Primitive::String(url.path().to_string());
-    let (path_variables, middleware) = {
+    let (path_variables, route) = {
         let path_segments = if url.path() == "/" || url.path().is_empty() {
             vec![PathSegment::Root]
         } else {
@@ -420,35 +414,35 @@ fn request_to_primitive<'a, 'b>(
 
         let mut res = (BTreeMap::new(), None);
 
-        // determine which middleware
-        'middlewareLoop: for middleware in middlewares {
+        // determine which route
+        'routeLoop: for route in routes {
             res.1 = None;
-            if &middleware.method != req.method() {
-                continue 'middlewareLoop;
+            if &route.method != req.method() {
+                continue 'routeLoop;
             }
-            if middleware.path_segments.len() == path_segments.len() {
-                for (segment_from_req, segment_from_middleware) in
-                    path_segments.iter().zip(middleware.path_segments.iter())
+            if route.path_segments.len() == path_segments.len() {
+                for (segment_from_req, segment_from_route) in
+                    path_segments.iter().zip(route.path_segments.iter())
                 {
-                    match (segment_from_req, segment_from_middleware) {
+                    match (segment_from_req, segment_from_route) {
                         (PathSegment::Root, PathSegment::Root) => {
-                            res.1 = Some(middleware);
-                            break 'middlewareLoop;
+                            res.1 = Some(route);
+                            break 'routeLoop;
                         }
                         (PathSegment::Root, PathSegment::String(_))
                         | (PathSegment::Root, PathSegment::Variable { .. })
                         | (PathSegment::String(_), PathSegment::Root) => {
-                            continue 'middlewareLoop;
+                            continue 'routeLoop;
                         }
                         (PathSegment::String(s), PathSegment::String(s2)) => {
                             if s != s2 {
-                                continue 'middlewareLoop;
+                                continue 'routeLoop;
                             } else {
-                                res.1 = Some(middleware);
+                                res.1 = Some(route);
                             }
                         }
                         (PathSegment::String(value), PathSegment::Variable { name, .. }) => {
-                            res.1 = Some(middleware);
+                            res.1 = Some(route);
                             res.0
                                 .insert(name.to_string(), Primitive::String(value.to_string()));
                         }
@@ -458,7 +452,7 @@ fn request_to_primitive<'a, 'b>(
                     }
                 }
                 if res.1.is_some() {
-                    break 'middlewareLoop;
+                    break 'routeLoop;
                 }
             }
         }
@@ -466,8 +460,8 @@ fn request_to_primitive<'a, 'b>(
         res
     };
 
-    if middleware.is_none() {
-        return Ok((Primitive::Null, middleware));
+    if route.is_none() {
+        return Ok((Primitive::Null, route));
     }
 
     let ct = get_content_type(req);
@@ -527,7 +521,7 @@ fn request_to_primitive<'a, 'b>(
         req_p.insert("form".to_string(), Primitive::Struct(body));
     };
 
-    Ok((Primitive::Struct(req_p), middleware))
+    Ok((Primitive::Struct(req_p), route))
 }
 
 fn headers_to_primitive(headers: &[Header]) -> Primitive {
@@ -568,21 +562,21 @@ fn compile_statics(statics: Vec<Primitive>) -> anyhow::Result<Vec<StaticServe>> 
     }
     Ok(static_serve)
 }
-fn compile_middlewares(middlewares: Vec<Primitive>) -> anyhow::Result<Vec<Middleware>> {
-    fn compile_middleware(middleware: Primitive) -> anyhow::Result<Middleware> {
-        match middleware {
+fn compile_routes(routes: Vec<Primitive>) -> anyhow::Result<Vec<Route>> {
+    fn compile_route(route: Primitive) -> anyhow::Result<Route> {
+        match route {
             Primitive::Ref(p) => {
                 let p = p
                     .read()
                     .map_err(|e| anyhow::anyhow!("could not acquire lock {e}"))?;
-                compile_middleware(p.clone())
+                compile_route(p.clone())
             }
-            Primitive::Struct(mut middleware) => {
-                let Some(Primitive::String(path)) = middleware.remove("path") else {
-                    return Err(anyhow::anyhow!("missing path param in middleware"));
+            Primitive::Struct(mut route) => {
+                let Some(Primitive::String(path)) = route.remove("path") else {
+                    return Err(anyhow::anyhow!("missing path param in route"));
                 };
                 if !path.starts_with("/") {
-                    return Err(anyhow!("path of middleware must start with /"));
+                    return Err(anyhow!("path of route must start with /"));
                 }
 
                 let segments = if path.len() == 1 {
@@ -603,31 +597,31 @@ fn compile_middlewares(middlewares: Vec<Primitive>) -> anyhow::Result<Vec<Middle
                     segments
                 };
 
-                let Some(Primitive::Function { parameters, exprs }) = middleware.remove("handler")
+                let Some(Primitive::Function { parameters, exprs }) = route.remove("handler")
                 else {
-                    return Err(anyhow::anyhow!("missing handler param i middleware"));
+                    return Err(anyhow::anyhow!("missing handler param i route"));
                 };
                 if parameters.len() != 2 {
                     return Err(anyhow!(
-                        "Middleware must have exactly two parameters (req, store)"
+                        "route must have exactly two parameters (req, store)"
                     ));
                 }
-                let Some(Primitive::String(method)) = middleware.remove("method") else {
+                let Some(Primitive::String(method)) = route.remove("method") else {
                     return Err(anyhow!("missing method"));
                 };
 
-                Ok(Middleware {
+                Ok(Route {
                     path_segments: segments,
                     function: Primitive::Function { parameters, exprs }.to_value()?,
                     method: Method::from_str(&method).map_err(|e| anyhow!("bad method {e:?}"))?,
                 })
             }
-            _ => Err(anyhow::anyhow!("invalid middleware")),
+            _ => Err(anyhow::anyhow!("invalid route")),
         }
     }
-    let mut compiled = Vec::with_capacity(middlewares.len());
-    for middleware in middlewares {
-        compiled.push(compile_middleware(middleware)?);
+    let mut compiled = Vec::with_capacity(routes.len());
+    for route in routes {
+        compiled.push(compile_route(route)?);
     }
     Ok(compiled)
 }

@@ -10,7 +10,7 @@ settings = struct {
          file_path: "./public/"
       }
    ],
-    middlewares: [
+    routes: [
        struct {
       	path: "/api/todos",
       	handler: (req, store) => {

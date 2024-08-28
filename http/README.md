@@ -17,7 +17,7 @@ settings = struct {
          file_path: "/devdisk/sideprojects/adana-playground"
       }
    ],
-   middlewares: [
+   routes: [
       struct {
       	path: "/todo",
       	handler: (req, store) => {
