@@ -51,6 +51,10 @@ pub struct HttpHandle {
     tx: Arc<Sender<bool>>,
 }
 
+fn server_header() -> Header {
+    Header::from_bytes(&b"Server"[..], &b"Adana"[..]).unwrap()
+}
+
 #[no_mangle]
 pub fn new(params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunctionCallResult {
     let server_addr = if params.len() == 1 {
@@ -58,6 +62,7 @@ pub fn new(params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunctionCa
     } else {
         "0.0.0.0:8000".into()
     };
+
     match Server::http(&server_addr) {
         Ok(server) => Ok(Primitive::LibData(LibData {
             data: Arc::new(Box::new(HttpServer {
@@ -192,26 +197,43 @@ fn handle_request(
     } else {
         let url = extract_path_from_url(&request)?;
         if let Some(st) = statics.iter().find(|s| url.path().starts_with(&s.path)) {
-            let mut p = PathBuf::from(url.path().replace(&st.path, &st.file_path));
+            let mut p = PathBuf::from(url.path().replacen(&st.path, &st.file_path, 1));
+            if p.is_relative() {
+                p = p.canonicalize()?;
+            }
             if p.is_dir() {
                 p.push("index.html"); // if it's a dir, index.html
             }
 
-            match File::open(p) {
+            match File::open(&p) {
                 Ok(f) => {
+                    let ct = mime_guess::from_path(&p).first_or_text_plain();
                     request
-                        .respond(Response::from_file(f))
+                        .respond(
+                            Response::from_file(f)
+                                .with_header(make_header(CONTENT_TYPE, &ct.to_string())?)
+                                .with_header(server_header()),
+                        )
                         .map_err(|e| anyhow!("could not respond: {e}"))?;
                 }
                 Err(_) => {
+                    println!("{p:?}");
                     request
-                        .respond(Response::from_string("NOT FOUND").with_status_code(404))
+                        .respond(
+                            Response::from_string("NOT FOUND")
+                                .with_status_code(404)
+                                .with_header(server_header()),
+                        )
                         .map_err(|e| anyhow!("could not respond: {e}"))?;
                 }
             }
         } else {
             request
-                .respond(Response::from_string("NOT FOUND").with_status_code(404))
+                .respond(
+                    Response::from_string("NOT FOUND")
+                        .with_status_code(404)
+                        .with_header(server_header()),
+                )
                 .map_err(|e| anyhow!("could not respond: {e}"))?;
         }
     }
@@ -238,20 +260,22 @@ fn handle_response(req: Request, res: &Primitive) -> anyhow::Result<()> {
                     )]))
                     .to_json()?,
                 )
+                .with_header(server_header())
                 .with_status_code(400);
                 response.add_header(make_header(CONTENT_TYPE, APPLICATION_JSON)?);
                 req.respond(response)
                     .map_err(|e| anyhow!("cannot respond {e}"))
             } else {
-                let response =
-                    Response::from_string(format!("Error: {res:?}")).with_status_code(400);
+                let response = Response::from_string(format!("Error: {res:?}"))
+                    .with_status_code(400)
+                    .with_header(server_header());
                 req.respond(response)
                     .map_err(|e| anyhow!("cannot respond {e}"))
             }
         }
 
         Primitive::String(s) => {
-            let mut response = Response::from_string(s);
+            let mut response = Response::from_string(s).with_header(server_header());
             if let Some(accept) = get_header(&req, ACCEPT) {
                 response.add_header(make_header(CONTENT_TYPE, &accept)?);
             }
@@ -262,7 +286,7 @@ fn handle_response(req: Request, res: &Primitive) -> anyhow::Result<()> {
             if get_header(&req, ACCEPT) == Some(APPLICATION_JSON.to_string())
                 || get_content_type(&req) == Some(APPLICATION_JSON.to_string()) =>
         {
-            let mut response = Response::from_string(v.to_json()?);
+            let mut response = Response::from_string(v.to_json()?).with_header(server_header());
             response.add_header(make_header(CONTENT_TYPE, APPLICATION_JSON)?);
             req.respond(response)
                 .map_err(|e| anyhow!("cannot respond {e}"))
@@ -280,13 +304,16 @@ fn handle_response(req: Request, res: &Primitive) -> anyhow::Result<()> {
         | Primitive::Array(_)
         | Primitive::NoReturn => {
             let response = Response::from_string(format!("SERVER ERROR: BAD RETURN {res:?}"))
-                .with_status_code(500);
+                .with_status_code(500)
+                .with_header(server_header());
             req.respond(response)
                 .map_err(|e| anyhow!("cannot respond {e}"))
         }
 
         Primitive::Unit => {
-            let response = Response::from_string("").with_status_code(200);
+            let response = Response::from_string("")
+                .with_status_code(200)
+                .with_header(server_header());
             req.respond(response)
                 .map_err(|e| anyhow!("cannot respond {e}"))
         }
@@ -328,7 +355,9 @@ fn handle_response(req: Request, res: &Primitive) -> anyhow::Result<()> {
                 200
             };
 
-            let mut response = Response::from_string(body).with_status_code(status);
+            let mut response = Response::from_string(body)
+                .with_status_code(status)
+                .with_header(server_header());
             for h in headers.iter().map(|(k, v)| make_header(k, &v.to_string())) {
                 response.add_header(h?);
             }
@@ -522,9 +551,20 @@ fn compile_statics(statics: Vec<Primitive>) -> anyhow::Result<Vec<StaticServe>> 
         let Some(Primitive::String(path)) = st.remove("path") else {
             return Err(anyhow!("missing path in static"));
         };
-        let Some(Primitive::String(file_path)) = st.remove("file_path") else {
+        let Some(Primitive::String(mut file_path)) = st.remove("file_path") else {
             return Err(anyhow!("missing file_path in static"));
         };
+
+        let pb = PathBuf::from(&file_path);
+        if pb.is_relative() || pb.is_symlink() {
+            let pb = pb.canonicalize()?;
+
+            file_path = pb.display().to_string();
+        }
+        if !file_path.ends_with(std::path::MAIN_SEPARATOR) {
+            file_path.push(std::path::MAIN_SEPARATOR);
+        }
+
         static_serve.push(StaticServe { path, file_path });
     }
     Ok(static_serve)

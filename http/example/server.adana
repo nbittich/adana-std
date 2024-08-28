@@ -1,0 +1,16 @@
+http = require("/devdisk/sideprojects/adana-std/target/release/libadana_std_http.so")
+http_server=http.new() # listen to 8000 by default
+
+settings = struct {
+   store: struct {todos: []}, # mutable shared data
+   static: [
+      struct {
+         path: "/",
+         file_path: "./public/"
+      }
+   ],
+    middlewares: []
+
+}
+
+http_handle = http.start(http_server, settings)
