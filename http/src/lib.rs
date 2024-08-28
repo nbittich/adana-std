@@ -217,7 +217,6 @@ fn handle_request(
                         .map_err(|e| anyhow!("could not respond: {e}"))?;
                 }
                 Err(_) => {
-                    println!("{p:?}");
                     request
                         .respond(
                             Response::from_string("NOT FOUND")

@@ -1,4 +1,5 @@
 http = require("/devdisk/sideprojects/adana-std/target/release/libadana_std_http.so")
+uuid = require("/devdisk/sideprojects/adana-std/target/release/libadana_std_uuid.so")
 http_server=http.new() # listen to 8000 by default
 
 settings = struct {
@@ -9,7 +10,46 @@ settings = struct {
          file_path: "./public/"
       }
    ],
-    middlewares: []
+    middlewares: [
+       struct {
+      	path: "/api/todos",
+      	handler: (req, store) => {
+      	    todo = struct {value: req.form.todo, id: uuid.new()}
+             store.todos += [todo]
+      	    return struct {
+              status: 200,
+              body: struct { response: todo },
+              headers: struct { "Content-Type": "application/json"}
+            }
+      	},
+        method: "POST"
+      },
+      struct {
+      	path: "/api/todos/:id",
+      	handler: (req, store) => {
+      	    todo = null
+      	    for t in store.todos {
+      	       if t.id == req.params.id  {
+      	         todo = t
+      	       }
+      	    }
+             if todo != null {
+                 return struct {
+                     status: 200,
+                     body: struct { todo: todo },
+                     headers: struct { "Content-Type": "application/json"}
+                 }
+             } else {
+                return struct {
+                     status: 404,
+                     body: struct {response: "not found"},
+                     headers: struct { "Content-Type": "application/json"}
+                }
+             }
+      	},
+        method: "GET"
+      }
+    ]
 
 }
 

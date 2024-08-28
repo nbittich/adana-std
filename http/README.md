@@ -18,7 +18,6 @@ settings = struct {
       }
    ],
    middlewares: [
-
       struct {
       	path: "/todo",
       	handler: (req, store) => {
