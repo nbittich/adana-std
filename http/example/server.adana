@@ -12,6 +12,25 @@ settings = struct {
    ],
     routes: [
        struct {
+        path: "/api/todos/:id",
+      	handler: (req, store) => {
+      	  updated = false
+          for idx,t in store.todos {
+      	       if t.id == req.params.id  {
+      	         store.todos[idx].checked = req.body.checked;  
+      	         updated = true
+      	         break
+      	       }
+      	    }
+      	    return struct {
+              status: 200,
+              body: struct { updated: updated },
+              headers: struct { "Content-Type": "application/json"}
+            }
+      	},
+        method: "POST"
+      },
+       struct {
         path: "/api/todos",
       	handler: (req, store) => {
       	    todo = struct {value: req.form.todo, id: uuid.new(), checked: false}
