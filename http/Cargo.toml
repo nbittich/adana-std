@@ -1,0 +1,22 @@
+[package]
+name = "adana-std-http"
+version = { workspace = true }
+edition = { workspace = true }
+description = { workspace = true }
+license = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+authors = { workspace = true }
+
+[lib]
+crate-type = ["dylib"]
+
+[dependencies]
+adana-script-core = { workspace = true }
+anyhow = { workspace = true }
+tiny_http = { workspace = true }
+url = { workspace = true }
+multipart2 = { workspace = true, features = ["tiny_http"] }
+form_urlencoded = { workspace = true }
+mime_guess.workspace=true
