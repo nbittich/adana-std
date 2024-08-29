@@ -16,7 +16,7 @@ uuid="1.10.0"
 [workspace.package]
 
 authors = ["Nordine Bittich"]
-version = "0.17.11"
+version = "0.18.1"
 description = "Adana standard library"
 documentation = "https://github.com/nbittich/adana-std"
 repository = "https://github.com/nbittich/adana-std"
