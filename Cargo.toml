@@ -4,7 +4,7 @@ resolver = "2"
 
 [workspace.dependencies]
 #adana-script-core = "0.17.11"
-adana-script-core = { git = "https://github.com/nbittich/adana.git", branch = "feature/multidepth" }
+adana-script-core = "0.18.1"
 tiny_http = "0.12.0"
 anyhow = "1.0.86"
 chrono = "0.4.38"
