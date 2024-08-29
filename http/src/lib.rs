@@ -168,7 +168,7 @@ fn handle_request(
     compiler: &mut Box<Compiler>,
     store: Primitive,
 ) -> anyhow::Result<()> {
-    let (req, route) = match request_to_primitive(&mut request, &routes) {
+    let (req, route) = match request_to_primitive(&mut request, routes) {
         Ok((r, m)) => (r, m),
         Err(e) => {
             println!("err {e:?}");
@@ -205,7 +205,7 @@ fn handle_request(
                     request
                         .respond(
                             Response::from_file(f)
-                                .with_header(make_header(CONTENT_TYPE, &ct.to_string())?)
+                                .with_header(make_header(CONTENT_TYPE, ct.as_ref())?)
                                 .with_header(server_header()),
                         )
                         .map_err(|e| anyhow!("could not respond: {e}"))?;
@@ -337,7 +337,7 @@ fn handle_response(req: Request, res: &Primitive) -> anyhow::Result<()> {
             } else {
                 "text/html".to_string()
             };
-            let body = if &ct == APPLICATION_JSON {
+            let body = if ct == APPLICATION_JSON {
                 body.to_json()?
             } else {
                 body.to_string()
@@ -388,8 +388,8 @@ fn extract_path_from_url(req: &Request) -> anyhow::Result<Url> {
     Ok(url)
 }
 
-fn request_to_primitive<'a, 'b>(
-    req: &'b mut Request,
+fn request_to_primitive<'a>(
+    req: &mut Request,
     routes: &'a [Route],
 ) -> anyhow::Result<(Primitive, Option<&'a Route>)> {
     let headers = headers_to_primitive(req.headers());
