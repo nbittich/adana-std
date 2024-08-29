@@ -584,8 +584,8 @@ fn compile_routes(routes: Vec<Primitive>) -> anyhow::Result<Vec<Route>> {
                 } else {
                     let mut segments = vec![];
                     for (pos, segment) in path.split('/').filter(|p| !p.is_empty()).enumerate() {
-                        if segment.starts_with(":") {
-                            let segment = segment[1..].to_string();
+                        if let Some(stripped) = segment.strip_prefix(":") {
+                            let segment = stripped.to_string();
                             segments.push(PathSegment::Variable {
                                 position: pos,
                                 name: segment,
@@ -629,7 +629,7 @@ fn compile_routes(routes: Vec<Primitive>) -> anyhow::Result<Vec<Route>> {
 #[no_mangle]
 pub fn stop(mut params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunctionCallResult {
     if params.len() != 1 {
-        return Err(anyhow::anyhow!("invalid param"));
+        Err(anyhow::anyhow!("invalid param"))
     } else if let Some(Primitive::LibData(lib_data)) = params.get_mut(0) {
         let data = lib_data.data.clone();
 
@@ -640,7 +640,7 @@ pub fn stop(mut params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunct
                         server.tx.send(true)?;
                         match handle.join() {
                             Ok(r) => {
-                                let _ = r.map_err(|e| anyhow::anyhow!("{e}"))?;
+                                r.map_err(|e| anyhow::anyhow!("{e}"))?;
                                 println!("server stopped");
                                 return Ok(Primitive::Unit);
                             }
