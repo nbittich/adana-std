@@ -12,10 +12,10 @@ settings = struct {
    ],
     routes: [
        struct {
-      	path: "/api/todos",
+        path: "/api/todos",
       	handler: (req, store) => {
-      	    todo = struct {value: req.form.todo, id: uuid.new()}
-             store.todos += [todo]
+      	    todo = struct {value: req.form.todo, id: uuid.new(), checked: false}
+            store.todos += [todo]
       	    return struct {
               status: 200,
               body: struct { response: todo },
@@ -24,7 +24,7 @@ settings = struct {
       	},
         method: "POST"
       },
-      struct {
+struct {
       	path: "/api/todos/:id",
       	handler: (req, store) => {
       	    todo = null
@@ -39,15 +39,27 @@ settings = struct {
                      body: struct { todo: todo },
                      headers: struct { "Content-Type": "application/json"}
                  }
-             } else {
-                return struct {
-                     status: 404,
-                     body: struct {response: "not found"},
-                     headers: struct { "Content-Type": "application/json"}
-                }
+             } 
+             return struct {
+                    status: 404,
+                    body: struct {response: "not found"},
+                    headers: struct { "Content-Type": "application/json"}
              }
+             
       	},
         method: "GET"
+      },
+      struct {
+        path: "/api/todos",
+        method: "GET",
+        handler: (req, store) => {
+            return struct {
+                        status: 200,
+                        body: struct { todos: store.todos },
+                        headers: struct { "Content-Type": "application/json"}
+            }
+        }
+
       }
     ]
 
