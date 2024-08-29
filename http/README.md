@@ -3,7 +3,7 @@
 ## usage
 
 ```
-http = require("/devdisk/sideprojects/adana-std/target/release/libadana_std_http.so")
+http = require("@std/http")
 http_server=http.new() # listen to 8000 by default
 settings = struct {
    store: struct {todos: []},
