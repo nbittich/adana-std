@@ -17,37 +17,40 @@ addTodoBtn.onclick = async (event) => {
       body: params,
     });
     if (!response.ok) {
-      const error = await response.json();
+      const error = await response.text();
       alert(error);
     } else {
-      await listTodos();
+      const todo = await response.json();
+      appendTodo(todo);
     }
     inputText.value = "";
   }
 };
 
+function appendTodo(todo) {
+  const todoItem = document.createElement("todo-item");
+  todoItem.title = todo.value;
+  todoItem.dataset.id = todo.id;
+  todoItem.checked = todo.checked;
+  todoItem.checkedEventHandler = async (event) => {
+    const response = await fetch(`/api/todos/${todo.id}`, {
+      method: "POST", // Specify the method
+      headers: {
+        "Content-Type": "application/json", // Set the Content-Type header
+      },
+      body: JSON.stringify({ checked: event.target.checked }), // Convert the data object to a JSON string
+    });
+    if (!response.ok) {
+      console.log("err:", await response.text());
+    }
+  };
+  todoContainer.appendChild(todoItem);
+}
 async function listTodos() {
   const response = await fetch("/api/todos");
   const todos = await response.json();
   todoContainer.innerHTML = "";
-  for (const todo of todos.todos) {
-    const todoItem = document.createElement("todo-item");
-    todoItem.title = todo.value;
-    todoItem.dataset.id = todo.id;
-    todoItem.checked = todo.checked;
-    todoItem.checkedEventHandler = async (event) => {
-      const response = await fetch(`/api/todos/${todo.id}`, {
-        method: "POST", // Specify the method
-        headers: {
-          "Content-Type": "application/json", // Set the Content-Type header
-        },
-        body: JSON.stringify({ checked: event.target.checked }), // Convert the data object to a JSON string
-      });
-      if (!response.ok) {
-        console.log("err:", await response.text());
-        await listTodos();
-      }
-    };
-    todoContainer.appendChild(todoItem);
+  for (const todo of todos) {
+    appendTodo(todo);
   }
 }

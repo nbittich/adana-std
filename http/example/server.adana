@@ -37,7 +37,7 @@ settings = struct {
             store.todos += [todo]
       	    return struct {
               status: 200,
-              body: struct { response: todo },
+              body: todo ,
               headers: struct { "Content-Type": "application/json"}
             }
       	},
@@ -55,7 +55,7 @@ struct {
              if todo != null {
                  return struct {
                      status: 200,
-                     body: struct { todo: todo },
+                     body: todo,
                      headers: struct { "Content-Type": "application/json"}
                  }
              } 
@@ -74,7 +74,7 @@ struct {
         handler: (req, store) => {
             return struct {
                         status: 200,
-                        body: struct { todos: store.todos },
+                        body: store.todos,
                         headers: struct { "Content-Type": "application/json"}
             }
         }
