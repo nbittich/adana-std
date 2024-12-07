@@ -4,23 +4,23 @@ resolver = "2"
 
 [workspace.dependencies]
 #adana-script-core = "0.17.11"
-adana-script-core = "0.18.2"
+adana-script-core = "0.18.5"
 tiny_http = "0.12.0"
-anyhow = "1.0.86"
+anyhow = "1.0.94"
 chrono = "0.4.38"
-url = "2.5.2"
+url = "2.5.4"
 multipart2 = "0.19.1"
 form_urlencoded = "1.2.1"
-mime_guess="2"
-uuid="1.10.0"
+mime_guess="2.0.5"
+uuid="1.11.0"
 [workspace.package]
 
 authors = ["Nordine Bittich"]
-version = "0.18.2"
+version = "0.18.5"
 description = "Adana standard library"
 documentation = "https://github.com/nbittich/adana-std"
 repository = "https://github.com/nbittich/adana-std"
-rust-version = "1.80"
+rust-version = "1.83"
 edition = "2021"
 license = "MIT"
 
