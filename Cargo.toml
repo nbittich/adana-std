@@ -4,10 +4,10 @@ resolver = "2"
 
 [workspace.dependencies]
 #adana-script-core = "0.17.11"
-adana-script-core = "0.18.5"
+adana-script-core = "0.18.6"
 tiny_http = "0.12.0"
-anyhow = "1.0.94"
-chrono = "0.4.38"
+anyhow = "1.0.95"
+chrono = "0.4.39"
 url = "2.5.4"
 multipart2 = "0.19.1"
 form_urlencoded = "1.2.1"
@@ -16,7 +16,7 @@ uuid="1.11.0"
 [workspace.package]
 
 authors = ["Nordine Bittich"]
-version = "0.18.5"
+version = "0.18.6"
 description = "Adana standard library"
 documentation = "https://github.com/nbittich/adana-std"
 repository = "https://github.com/nbittich/adana-std"
