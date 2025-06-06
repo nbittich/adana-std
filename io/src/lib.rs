@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, io::Write};
 
 use adana_script_core::primitive::{Compiler, NativeFunctionCallResult, Primitive};
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub fn read_line(params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunctionCallResult {
     let message = if params.is_empty() {
         "".into()
@@ -23,7 +23,7 @@ pub fn read_line(params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunc
     Ok(Primitive::String(buf))
 }
 /// Api description
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub fn api_description(
     _params: Vec<Primitive>,
     _compiler: Box<Compiler>,

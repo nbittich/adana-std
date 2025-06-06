@@ -1,7 +1,7 @@
 use adana_script_core::primitive::{Compiler, NativeFunctionCallResult, Primitive};
 use anyhow::Context;
 use chrono::DateTime;
-use chrono::{offset::Local, Datelike, NaiveDate, NaiveDateTime, Timelike};
+use chrono::{Datelike, NaiveDate, NaiveDateTime, Timelike, offset::Local};
 use std::collections::BTreeMap;
 use std::fmt::Write;
 
@@ -41,7 +41,7 @@ fn make_date_time_struct(d: &NaiveDateTime) -> Primitive {
     ]))
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 fn from(mut params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunctionCallResult {
     if params.len() < 3 {
         return Err(anyhow::anyhow!(
@@ -74,7 +74,7 @@ fn from(mut params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunctionC
     Ok(make_date_time_struct(&date))
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 fn format(mut params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunctionCallResult {
     if params.is_empty() {
         return Err(anyhow::anyhow!(
@@ -106,7 +106,7 @@ fn format(mut params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunctio
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 fn parse(mut params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunctionCallResult {
     if params.is_empty() {
         return Err(anyhow::anyhow!(
@@ -147,14 +147,14 @@ fn parse(mut params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunction
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub fn now(_params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunctionCallResult {
     let now = Local::now().naive_local();
     Ok(make_date_time_struct(&now))
 }
 
 /// Api description
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub fn api_description(
     _params: Vec<Primitive>,
     _compiler: Box<Compiler>,

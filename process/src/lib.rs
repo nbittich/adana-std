@@ -1,11 +1,11 @@
 use std::{collections::BTreeMap, io::Write, thread::JoinHandle, time::Duration};
 
 use adana_script_core::{
-    primitive::{Compiler, NativeFunctionCallResult, Primitive},
     Value,
+    primitive::{Compiler, NativeFunctionCallResult, Primitive},
 };
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub fn environ(params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunctionCallResult {
     if params.is_empty() {
         let s = std::env::vars()
@@ -20,7 +20,7 @@ pub fn environ(params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFuncti
         Ok(r)
     }
 }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub fn delay(mut params: Vec<Primitive>, mut compiler: Box<Compiler>) -> NativeFunctionCallResult {
     if params.is_empty() {
         Err(anyhow::anyhow!("at least one parameter must be provided"))
@@ -32,7 +32,7 @@ pub fn delay(mut params: Vec<Primitive>, mut compiler: Box<Compiler>) -> NativeF
             e => {
                 return Err(anyhow::anyhow!(
                     "first parameter must be the sleep duration (int) => {e}"
-                ))
+                ));
             }
         };
 
@@ -79,7 +79,7 @@ pub fn delay(mut params: Vec<Primitive>, mut compiler: Box<Compiler>) -> NativeF
     }
 }
 /// Api description
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub fn api_description(
     _params: Vec<Primitive>,
     _compiler: Box<Compiler>,

@@ -5,8 +5,8 @@ use std::{
     path::PathBuf,
     str::FromStr,
     sync::{
-        mpsc::{self, Sender},
         Arc, Mutex,
+        mpsc::{self, Sender},
     },
     thread::JoinHandle,
     time::Duration,
@@ -17,8 +17,8 @@ const FORM_URL_ENCODED: &str = "application/x-www-form-urlencoded";
 const ACCEPT: &str = "Accept";
 const CONTENT_TYPE: &str = "Content-Type";
 use adana_script_core::{
-    primitive::{Compiler, Json, LibData, NativeFunctionCallResult, Primitive, ToNumber},
     Value,
+    primitive::{Compiler, Json, LibData, NativeFunctionCallResult, Primitive, ToNumber},
 };
 use anyhow::anyhow;
 use multipart2::server::Multipart;
@@ -55,7 +55,7 @@ fn server_header() -> Header {
     Header::from_bytes(&b"Server"[..], &b"Adana"[..]).unwrap()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub fn new(params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunctionCallResult {
     let server_addr = if params.len() == 1 {
         params[0].to_string()
@@ -74,7 +74,7 @@ pub fn new(params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunctionCa
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub fn start(mut params: Vec<Primitive>, mut compiler: Box<Compiler>) -> NativeFunctionCallResult {
     if params.len() != 2 {
         return Err(anyhow::anyhow!(
@@ -447,7 +447,7 @@ fn request_to_primitive<'a>(
                                 .insert(name.to_string(), Primitive::String(value.to_string()));
                         }
                         (PathSegment::Variable { .. }, _) => {
-                            return Err(anyhow!("BUG. Cannot be a PathSegment::Variable here"))
+                            return Err(anyhow!("BUG. Cannot be a PathSegment::Variable here"));
                         }
                     }
                 }
@@ -626,7 +626,7 @@ fn compile_routes(routes: Vec<Primitive>) -> anyhow::Result<Vec<Route>> {
     Ok(compiled)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub fn stop(mut params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunctionCallResult {
     if params.len() != 1 {
         Err(anyhow::anyhow!("invalid param"))

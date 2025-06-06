@@ -54,7 +54,7 @@ fn _write(params: &[Primitive], open_options: &mut OpenOptions) -> NativeFunctio
     Ok(Primitive::Unit)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub fn read_file(params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunctionCallResult {
     let mut open_options = OpenOptions::new();
     let open_options = open_options.read(true).write(false);
@@ -72,7 +72,7 @@ pub fn read_file(params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunc
     ))
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub fn make_dir(params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunctionCallResult {
     let mut open_options = OpenOptions::new();
     let open_options = open_options.read(true).write(false);
@@ -81,7 +81,7 @@ pub fn make_dir(params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunct
     Ok(Primitive::Unit)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub fn make_dir_all(params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunctionCallResult {
     let mut open_options = OpenOptions::new();
     let open_options = open_options.read(true).write(false);
@@ -90,7 +90,7 @@ pub fn make_dir_all(params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeF
     Ok(Primitive::Unit)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub fn read_dir(params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunctionCallResult {
     let mut open_options = OpenOptions::new();
     let open_options = open_options.read(true).write(false);
@@ -114,7 +114,7 @@ pub fn read_dir(params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunct
     Ok(Primitive::Array(arr))
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub fn delete_file(params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunctionCallResult {
     let mut open_options = OpenOptions::new();
     let open_options = open_options.read(true).write(false);
@@ -124,7 +124,7 @@ pub fn delete_file(params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFu
     Ok(Primitive::Unit)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub fn path_exists(params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunctionCallResult {
     let mut open_options = OpenOptions::new();
     let open_options = open_options.read(true).write(false);
@@ -133,7 +133,7 @@ pub fn path_exists(params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFu
     Ok(Primitive::Bool(pb.exists()))
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub fn delete_empty_dir(
     params: Vec<Primitive>,
     _compiler: Box<Compiler>,
@@ -147,7 +147,7 @@ pub fn delete_empty_dir(
     Ok(Primitive::Unit)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub fn delete_dir_all(
     params: Vec<Primitive>,
     _compiler: Box<Compiler>,
@@ -161,21 +161,21 @@ pub fn delete_dir_all(
     Ok(Primitive::Unit)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub fn write_file(params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunctionCallResult {
     let mut open_options = OpenOptions::new();
     let open_options = open_options.write(true);
     _write(&params, open_options)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub fn append_file(params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunctionCallResult {
     let mut open_options = OpenOptions::new();
     let open_options = open_options.append(true);
     _write(&params, open_options)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub fn rename_file_or_directory(
     params: Vec<Primitive>,
     _compiler: Box<Compiler>,
@@ -190,7 +190,7 @@ pub fn rename_file_or_directory(
     Ok(Primitive::Unit)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub fn fd_stats(params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunctionCallResult {
     use std::time::UNIX_EPOCH;
     let mut open_options = OpenOptions::new();
@@ -245,7 +245,7 @@ pub fn fd_stats(params: Vec<Primitive>, _compiler: Box<Compiler>) -> NativeFunct
 }
 
 /// Api description
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub fn api_description(
     _params: Vec<Primitive>,
     _compiler: Box<Compiler>,
